@@ -7,22 +7,73 @@ output: github_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+Attempting to migrate previously worked R code into .rmd file:
+```{r, data setup, echo=FALSE, message=FALSE}
+require(ape)
+require(phytools)
+require(phangorn)
+require(scales)
+#setwd("C:/Users/Roi Maor/Desktop/Ch1 - Ancestral recons/BT analyses/BT workspace") # may not be the original folder used in this code
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+## preparing the LF85 tree for plotting, coloured by taxonomy (branches) and activity pattern (perimeter)
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+read.table("BT AP Data.txt") -> BayesData
+## preparing the Bininda-Emonds tree for plotting, coloured by taxonomy (branches) and activity pattern (perimeter)
+read.nexus("Mammalia_Best.txt") -> BEmtree
+unwantedspecies <- which(is.na(pmatch(BEmtree$tip.label,as.character(BayesData[,1]))) == TRUE) 
+drop.tip(BEmtree,unwantedspecies) -> datatree
+ladderize(datatree) -> datalad
+trimdat <- BayesData[which(BayesData[,1] %in% datalad$tip.label),] 
 
-```{r cars}
-summary(cars)
+BEMLabel <- character(length(datalad$tip.label))
+names(BEMLabel) <- trimdat[,1]
+BEMLabel[trimdat[,2]==1] <- "dodgerblue3"
+BEMLabel[trimdat[,2]==3] <- "#22dd11"
+BEMLabel[trimdat[,2]==5] <- "gold"
+BEMLabel[which(BEMLabel[] == '')] <- "magenta2" 
+
+BemEDGE <- as.matrix(datalad$edge)
+BemEDGE <- cbind(BemEDGE, "black")
+names(BemEDGE) <- names(datatree$edge.length)
+# loop over edge from the ancestor node to all descendants and assign the order's colour
+# use argument edge.color in plot() function
+
+mar <- getMRCA(datatree, c('Macropus_agilis','Marmosa_rubra'))    # marsupials
+afr <- getMRCA(datatree, c('Dugong_dugon','Chrysochloris_asiatica')) # afrotheria
+rod <- getMRCA(datatree, c('Castor_canadensis','Sciurus_niger'))     # Rodentia
+cet <- getMRCA(datatree, c('Camelus_dromedarius','Axis_kuhlii'))     # Cetartiodactyla
+pri <- getMRCA(datatree, c('Indri_indri','Cebus_albifrons'))         # Primates
+chi <- getMRCA(datatree, c('Pteropus_alecto','Noctilio_leporinus'))  # Chiroptera
+car <- getMRCA(datatree, c('Felis_manul','Nasua_nasua'))             # Carnivora
+sor <- getMRCA(datatree, c('Solenodon_cubanus','Talpa_levantis'))    # Soricomorpha
+
+#orders <- c(3664,3547,3391,2368,3073,2865,3194)
+orders <- c(mar,afr,rod,cet,pri,chi,car,sor)
+colours <- c("deeppink1","#4d1d0ad0","darkorange2","goldenrod1","purple4","blue","gray60","green4")
+
+for (k in 1:length(orders)) {
+  AncNode <- orders[k]
+  CladeSpp <- Descendants(datalad, AncNode, type="all")
+  edges <- BemEDGE[which(BemEDGE[,2] %in% CladeSpp),]
+  BemEDGE[which(BemEDGE[,2] == AncNode),3] <- as.character(colours[k]) ## colouring the order root branch
+  for (i in 1:length(edges[,2])) {
+    edges[i,3] <- as.character(colours[k])
+    BemEDGE[which(BemEDGE[,2] == edges[i,2]),3] <- edges[i,3]
+  }
+} 
+
+# suppress warnings from ring()
+oldw <- getOption("warn")
+options(warn = -1)
+
+plot(datalad, type = "fan", open.angle = 7, lwd = 0.4, label.offset = 0.4, cex = 0.3, show.tip.label = TRUE, 
+     tip.color = "white", edge.color = BemEDGE[,3])
+ring(20, datalad, style = "ring", offset = 1.5, col = BEMLabel[datalad$tip.label])
+ring(-100.2, datalad, style = "ring", offset = -66, col = alpha("#67c5ca", 0.25))
+axis(side = 1, at = c(6.2,46.2,86.2,126.2,166.2), labels = c(160,120,80,40,0), tick = TRUE, pos = -0.3, 
+     cex.axis = 4, lwd = 3, lwd.ticks = 6, padj = 0.4) 
+text(179, -5, "Mya", cex = 4.5)
+#text(x=-170, y=170, 'a', font = 2, cex=14, col='gray30')
+
+options(warn = oldw) # turn warnings back on
 ```
-
-## Including Plots
-
-You can also embed plots, for example:
-
-```{r pressure, echo=FALSE}
-plot(pressure)
-```
-
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
